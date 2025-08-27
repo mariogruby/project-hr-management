@@ -1,7 +1,8 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { User } from './schemas/user.schema';
+import { User, UserDocument } from './schemas/user.schema';
+import { Types } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { RegisterDto } from './dto/register.dto';
@@ -10,7 +11,7 @@ import { LoginDto } from './dto/login.dto';
 @Injectable()
 export class AuthService {
   constructor(
-    @InjectModel(User.name) private userModel: Model<User>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
     private jwtService: JwtService,
   ) {}
 
@@ -31,7 +32,7 @@ export class AuthService {
     await newUser.save();
 
     const token = this.jwtService.sign({
-      userId: newUser._id,
+      userId: newUser._id.toString(),
       role: newUser.role,
     });
     return { token };
@@ -45,12 +46,30 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const token = this.jwtService.sign({ userId: user._id, role: user.role });
+    const token = this.jwtService.sign({
+      userId: user._id.toString(),
+      role: user.role,
+    });
     return { token };
   }
 
   async validateUser(id: string): Promise<User> {
     const user = await this.userModel.findById(id);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    return user;
+  }
+
+  async updateUserCompany(
+    userId: string,
+    companyId: Types.ObjectId,
+  ): Promise<UserDocument> {
+    const user = await this.userModel.findByIdAndUpdate(
+      userId,
+      { companyId },
+      { new: true },
+    );
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
